@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>魔法氣泡 (Puyo Puyo) 手機與電腦練習曲</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            touch-action: none; /* 防止手機瀏覽器手勢干擾 */
+            user-select: none;
+        }
+        h2 { margin: 5px 0 10px 0; font-size: 20px; text-shadow: 0 0 5px #fff; }
+        .info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 310px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .game-layout {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            max-width: 320px;
+        }
+        canvas {
+            background-color: #000;
+            border: 3px solid #666;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+            image-rendering: pixelated;
+        }
+        #gameCanvas {
+            width: 240px; /* 保持比例 */
+            height: 480px;
+        }
+        .next-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        #nextCanvas {
+            width: 60px;
+            height: 220px;
+            margin-top: 5px;
+            background-color: #111;
+        }
+        .controls {
+            margin-top: 15px;
+            width: 100%;
+            max-width: 310px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        button {
+            background-color: #333;
+            color: #fff;
+            border: 2px solid #555;
+            border-radius: 8px;
+            padding: 15px 10px;
+            font-size: 18px;
+            font-weight: bold;
+            flex: 1;
+            touch-action: manipulation;
+            cursor: pointer;
+        }
+        button:active {
+            background-color: #555;
+        }
+        #btnDown {
+            background-color: #442222;
+        }
+        .keyboard-hint {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #aaa;
+            text-align: center;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>魔法氣泡練習曲</h2>
+    
+    <div class="info">
+        <div>分數: <span id="score">0</span></div>
+        <div>連鎖: <span id="chain">0</span></div>
+    </div>
+
+    <!-- 遊戲佈局：主畫布與預告區 -->
+    <div class="game-layout">
+        <!-- 遊戲畫布，6欄 12列 (每格 40x40 像素) -->
+        <canvas id="gameCanvas" width="240" height="480"></canvas>
+        
+        <!-- 預告區 -->
+        <div class="next-panel">
+            NEXT
+            <canvas id="nextCanvas" width="60" height="220"></canvas>
+        </div>
+    </div>
+
+    <!-- 虛擬按鍵 -->
+    <div class="controls">
+        <div class="row">
+            <button id="btnRotL">↺ 左轉</button>
+            <button id="btnRotR">↻ 右轉</button>
+        </div>
+        <div class="row">
+            <button id="btnLeft">⬅️ 左移</button>
+            <button id="btnDown">⬇️ 下降</button>
+            <button id="btnRight">➡️ 右移</button>
+        </div>
+    </div>
+
+    <!-- 鍵盤提示 -->
+    <div class="keyboard-hint">
+        【電腦鍵盤支援】<br>
+        移動：方向鍵 或 A/D/S | 快速落下：上 或 W<br>
+        旋轉：J (左轉) / K (右轉)
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const nextCanvas = document.getElementById('nextCanvas');
+    const nextCtx = nextCanvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const chainEl = document.getElementById('chain');
+
+    // 遊戲參數設定
+    const COLS = 6;
+    const ROWS = 12;
+    const BLOCK_SIZE = 40;
+    const COLORS = [
+        null, 
+        '#FF3333', // 1: 紅
+        '#33FF33', // 2: 綠
+        '#3333FF', // 3: 藍
+        '#FFFF33', // 4: 黃
+        '#CC33FF'  // 5: 紫
+    ];
+
+    let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    let score = 0;
+    let currentChain = 0;
+    let gameState = 'PLAYING'; // PLAYING, ANIMATING, GAMEOVER
+
+    // 當前落下的氣泡與預告佇列
+    let activePiece = null;
+    let nextPieces = [];
+    let dropInterval = 1200; // 落下速度 (1.2 秒)
+    let lastDropTime = Date.now();
+
+    // 隨機產生顏色
+    function getRandomColor() {
+        return Math.floor(Math.random() * 5) + 1;
+    }
+
+    // 產生新氣泡與維護預告佇列
+    function spawnPiece() {
+        // 初始化預告佇列
+        if (nextPieces.length === 0) {
+            nextPieces.push({ c1: getRandomColor(), c2: getRandomColor() });
+            nextPieces.push({ c1: getRandomColor(), c2: getRandomColor() });
+        }
+
+        // 從預告佇列取出下一個，並補充新的一組到佇列尾端
+        const next = nextPieces.shift();
+        nextPieces.push({ c1: getRandomColor(), c2: getRandomColor() });
+
+        activePiece = {
+            x: 2, y: 0,       // 軸心氣泡座標
+            color1: next.c1,  // 軸心氣泡顏色
+            color2: next.c2,  // 衛星氣泡顏色
+            rot: 0            // 0:上, 1:右, 2:下, 3:左 (衛星相對於軸心)
+        };
+        
+        drawNext();
+
+        // 檢查遊戲結束
+        if (grid[activePiece.y][activePiece.x] !== 0) {
+            gameState = 'GAMEOVER';
+            alert("遊戲結束！總分: " + score + "\n請重新整理頁面再來一局！");
+        }
+    }
+
+    // 取得衛星氣泡的座標
+    function getSatPos(x, y, rot) {
+        switch(rot) {
+            case 0: return { x: x, y: y - 1 };
+            case 1: return { x: x + 1, y: y };
+            case 2: return { x: x, y: y + 1 };
+            case 3: return { x: x - 1, y: y };
+        }
+    }
+
+    // 檢查碰撞
+    function isValid(pX, pY, pRot) {
+        const sat = getSatPos(pX, pY, pRot);
+        // 邊界檢查
+        if (pX < 0 || pX >= COLS || pY >= ROWS) return false;
+        if (sat.x < 0 || sat.x >= COLS || sat.y >= ROWS) return false;
+        // 網格佔用檢查
+        if (pY >= 0 && grid[pY][pX] !== 0) return false;
+        if (sat.y >= 0 && grid[sat.y][sat.x] !== 0) return false;
+        return true;
+    }
+
+    // 鎖定氣泡到網格中
+    function lockPiece() {
+        if (activePiece.y >= 0) grid[activePiece.y][activePiece.x] = activePiece.color1;
+        const sat = getSatPos(activePiece.x, activePiece.y, activePiece.rot);
+        if (sat.y >= 0) grid[sat.y][sat.x] = activePiece.color2;
+        
+        activePiece = null;
+        gameState = 'ANIMATING';
+        currentChain = 0;
+        processBoard();
+    }
+
+    // 處理重力下墜與消除 (連鎖判定)
+    function processBoard() {
+        let moved = applyGravity();
+        
+        // 留一點時間讓玩家看到氣泡落下
+        setTimeout(() => {
+            let cleared = checkClears();
+            if (cleared > 0) {
+                currentChain++;
+                chainEl.innerText = currentChain;
+                score += (cleared * 10) * currentChain;
+                scoreEl.innerText = score;
+                draw();
+                // 延遲後再次遞迴處理，形成連鎖視覺效果
+                setTimeout(processBoard, 400);
+            } else if (moved) {
+                // 有掉落但沒消除，檢查看看有沒有新消除
+                setTimeout(processBoard, 100);
+            } else {
+                // 盤面穩定
+                gameState = 'PLAYING';
+                chainEl.innerText = '0';
+                spawnPiece();
+            }
+        }, 150);
+    }
+
+    // 重力函數：讓懸空的氣泡掉到最底層
+    function applyGravity() {
+        let moved = false;
+        for (let c = 0; c < COLS; c++) {
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (grid[r][c] !== 0) {
+                    let currR = r;
+                    while (currR + 1 < ROWS && grid[currR + 1][c] === 0) {
+                        grid[currR + 1][c] = grid[currR][c];
+                        grid[currR][c] = 0;
+                        currR++;
+                        moved = true;
+                    }
+                }
+            }
+        }
+        return moved;
+    }
+
+    // 消除判定 (BFS 尋找同色相連>=4)
+    function checkClears() {
+        let visited = Array.from({length: ROWS}, () => Array(COLS).fill(false));
+        let toPop = [];
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (grid[r][c] !== 0 && !visited[r][c]) {
+                    let color = grid[r][c];
+                    let group = [];
+                    let queue = [{r, c}];
+                    visited[r][c] = true;
+
+                    while(queue.length > 0) {
+                        let p = queue.shift();
+                        group.push(p);
+                        let dirs = [[0,1], [0,-1], [1,0], [-1,0]];
+                        for (let d of dirs) {
+                            let nr = p.r + d[0], nc = p.c + d[1];
+                            if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && 
+                                !visited[nr][nc] && grid[nr][nc] === color) {
+                                visited[nr][nc] = true;
+                                queue.push({r: nr, c: nc});
+                            }
+                        }
+                    }
+                    if (group.length >= 4) {
+                        toPop = toPop.concat(group);
+                    }
+                }
+            }
+        }
+
+        // 執行消除
+        toPop.forEach(p => { grid[p.r][p.c] = 0; });
+        return toPop.length;
+    }
+
+    // 底層繪製實體氣泡的函式
+    function drawPuyoAtOrigin(targetCtx, px, py, colorIdx) {
+        targetCtx.beginPath();
+        targetCtx.arc(px + BLOCK_SIZE / 2, py + BLOCK_SIZE / 2, BLOCK_SIZE / 2 - 2, 0, Math.PI * 2);
+        targetCtx.fillStyle = COLORS[colorIdx];
+        targetCtx.fill();
+        targetCtx.strokeStyle = '#fff';
+        targetCtx.lineWidth = 1;
+        targetCtx.stroke();
+        
+        // 高光增加立體感
+        targetCtx.beginPath();
+        targetCtx.arc(px + BLOCK_SIZE / 2 - 6, py + BLOCK_SIZE / 2 - 6, BLOCK_SIZE / 6, 0, Math.PI * 2);
+        targetCtx.fillStyle = 'rgba(255,255,255,0.6)';
+        targetCtx.fill();
+    }
+
+    // 繪製主畫布
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (grid[r][c] !== 0) {
+                    drawPuyoAtOrigin(ctx, c * BLOCK_SIZE, r * BLOCK_SIZE, grid[r][c]);
+                }
+            }
+        }
+
+        if (activePiece && gameState === 'PLAYING') {
+            drawPuyoAtOrigin(ctx, activePiece.x * BLOCK_SIZE, activePiece.y * BLOCK_SIZE, activePiece.color1);
+            const sat = getSatPos(activePiece.x, activePiece.y, activePiece.rot);
+            if (sat.y >= 0) {
+                drawPuyoAtOrigin(ctx, sat.x * BLOCK_SIZE, sat.y * BLOCK_SIZE, activePiece.color2);
+            }
+        }
+    }
+
+    // 繪製預告區
+    function drawNext() {
+        nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+        const offsetX = (nextCanvas.width - BLOCK_SIZE) / 2;
+        
+        drawPuyoAtOrigin(nextCtx, offsetX, 10, nextPieces[0].c2);
+        drawPuyoAtOrigin(nextCtx, offsetX, 50, nextPieces[0].c1);
+
+        drawPuyoAtOrigin(nextCtx, offsetX, 120, nextPieces[1].c2);
+        drawPuyoAtOrigin(nextCtx, offsetX, 160, nextPieces[1].c1);
+    }
+
+    // ======= 玩家操作邏輯 =======
+    
+    function moveLeft() {
+        if (isValid(activePiece.x - 1, activePiece.y, activePiece.rot)) activePiece.x--;
+    }
+    function moveRight() {
+        if (isValid(activePiece.x + 1, activePiece.y, activePiece.rot)) activePiece.x++;
+    }
+    function moveDown() {
+        if (isValid(activePiece.x, activePiece.y + 1, activePiece.rot)) {
+            activePiece.y++;
+            lastDropTime = Date.now();
+        } else {
+            lockPiece();
+        }
+    }
+    function hardDrop() {
+        while (isValid(activePiece.x, activePiece.y + 1, activePiece.rot)) {
+            activePiece.y++;
+        }
+        lockPiece();
+        lastDropTime = Date.now();
+    }
+    function rotateLeft() {
+        const nextRot = (activePiece.rot + 3) % 4; // 逆時針
+        if (isValid(activePiece.x, activePiece.y, nextRot)) {
+            activePiece.rot = nextRot;
+        } else {
+            // 踢牆判定
+            if (isValid(activePiece.x + 1, activePiece.y, nextRot)) { activePiece.x++; activePiece.rot = nextRot; }
+            else if (isValid(activePiece.x - 1, activePiece.y, nextRot)) { activePiece.x--; activePiece.rot = nextRot; }
+        }
+    }
+    function rotateRight() {
+        const nextRot = (activePiece.rot + 1) % 4; // 順時針
+        if (isValid(activePiece.x, activePiece.y, nextRot)) {
+            activePiece.rot = nextRot;
+        } else {
+            // 踢牆判定
+            if (isValid(activePiece.x - 1, activePiece.y, nextRot)) { activePiece.x--; activePiece.rot = nextRot; }
+            else if (isValid(activePiece.x + 1, activePiece.y, nextRot)) { activePiece.x++; activePiece.rot = nextRot; }
+        }
+    }
+
+    // ======= 綁定鍵盤事件 =======
+    
+    document.addEventListener('keydown', (e) => {
+        if (gameState !== 'PLAYING') return;
+
+        // 防止方向鍵與空白鍵捲動網頁
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+            e.preventDefault();
+        }
+
+        switch (e.key) {
+            case 'ArrowLeft':
+            case 'a':
+            case 'A':
+                moveLeft();
+                break;
+            case 'ArrowRight':
+            case 'd':
+            case 'D':
+                moveRight();
+                break;
+            case 'ArrowDown':
+            case 's':
+            case 'S':
+                moveDown();
+                break;
+            case 'ArrowUp':
+            case 'w':
+            case 'W':
+                hardDrop();
+                break;
+            case 'j':
+            case 'J':
+                rotateLeft();
+                break;
+            case 'k':
+            case 'K':
+                rotateRight();
+                break;
+        }
+        draw(); // 操作後立刻重繪
+    });
+
+    // ======= 綁定虛擬按鍵 =======
+    
+    function bindControl(id, actionFn) {
+        const btn = document.getElementById(id);
+        const handler = (e) => {
+            e.preventDefault(); 
+            if(gameState !== 'PLAYING') return;
+            actionFn();
+            draw();
+        };
+        btn.addEventListener('touchstart', handler, {passive: false});
+        btn.addEventListener('mousedown', handler);
+    }
+
+    bindControl('btnLeft', moveLeft);
+    bindControl('btnRight', moveRight);
+    bindControl('btnDown', moveDown);
+    bindControl('btnRotL', rotateLeft);
+    bindControl('btnRotR', rotateRight);
+
+    // 遊戲主迴圈
+    function update() {
+        if (gameState === 'PLAYING') {
+            let now = Date.now();
+            if (now - lastDropTime > dropInterval) {
+                moveDown(); // 自然下落同等 moveDown()
+            }
+        }
+        draw();
+        requestAnimationFrame(update);
+    }
+
+    // 防止網頁上下捲動干擾(手機端)
+    document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
+
+    // 啟動遊戲
+    spawnPiece();
+    update();
+</script>
+</body>
+</html>
