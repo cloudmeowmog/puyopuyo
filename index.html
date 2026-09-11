@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>魔法氣泡 (Puyo Puyo) 手機與電腦練習曲</title>
+    <title>魔法氣泡 (Puyo Puyo) 掌機練習曲</title>
     <style>
         body {
             background-color: #1a1a1a;
@@ -18,12 +18,13 @@
             user-select: none;
         }
         h2 { margin: 5px 0 10px 0; font-size: 20px; text-shadow: 0 0 5px #fff; }
+        
         .settings-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             width: 100%;
-            max-width: 310px;
+            max-width: 320px;
             margin-bottom: 10px;
             background: #2a2a2a;
             padding: 8px;
@@ -54,10 +55,11 @@
             display: flex;
             justify-content: space-between;
             width: 100%;
-            max-width: 310px;
+            max-width: 320px;
             margin-bottom: 10px;
             font-weight: bold;
         }
+        
         .game-layout {
             display: flex;
             gap: 10px;
@@ -65,6 +67,13 @@
             align-items: flex-start;
             width: 100%;
             max-width: 320px;
+        }
+
+        /* 遊戲畫布與遮罩外層 */
+        .canvas-container {
+            position: relative;
+            width: 240px;
+            height: 480px;
         }
         canvas {
             background-color: #000;
@@ -74,9 +83,43 @@
             image-rendering: pixelated;
         }
         #gameCanvas {
-            width: 240px; /* 保持比例 */
-            height: 480px;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
         }
+        
+        /* 開始畫面遮罩 */
+        .start-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.75);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 5px;
+            z-index: 10;
+        }
+        .start-overlay.hidden {
+            display: none !important;
+        }
+        .btn-start {
+            background-color: #4CAF50;
+            color: white;
+            border: 2px solid #388E3C;
+            padding: 12px 24px;
+            font-size: 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            touch-action: manipulation;
+        }
+        .btn-start:active {
+            background-color: #388E3C;
+            transform: translateY(2px);
+            box-shadow: 0 2px 3px rgba(0,0,0,0.5);
+        }
+
         .next-panel {
             display: flex;
             flex-direction: column;
@@ -90,41 +133,107 @@
             margin-top: 5px;
             background-color: #111;
         }
-        .controls {
-            margin-top: 15px;
+
+        /* ======= 掌機控制器風格 ======= */
+        .controller {
+            margin-top: 25px;
             width: 100%;
-            max-width: 310px;
+            max-width: 320px;
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            box-sizing: border-box;
+            background: #2a2a2a;
+            border-radius: 20px;
+            border-bottom: 4px solid #111;
         }
-        .row {
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: 35px 35px 35px;
+            grid-template-rows: 35px 35px 35px;
+            position: relative;
+        }
+        .d-btn {
+            background-color: #444;
+            color: #ccc;
             display: flex;
             justify-content: center;
-            gap: 10px;
-        }
-        .control-btn {
-            background-color: #333;
-            color: #fff;
-            border: 2px solid #555;
-            border-radius: 8px;
-            padding: 15px 10px;
-            font-size: 18px;
-            font-weight: bold;
-            flex: 1;
-            touch-action: manipulation;
+            align-items: center;
             cursor: pointer;
+            touch-action: manipulation;
+            font-size: 18px;
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
         }
-        .control-btn:active {
-            background-color: #555;
+        .d-btn:active { background-color: #666; }
+        
+        .d-up { grid-column: 2; grid-row: 1; border-radius: 8px 8px 0 0; }
+        .d-left { grid-column: 1; grid-row: 2; border-radius: 8px 0 0 8px; }
+        .d-center { 
+            grid-column: 2; grid-row: 2; 
+            background-color: #444; 
+            box-shadow: none;
         }
-        #btnDown {
-            background-color: #442222;
+        .d-center::after {
+            content: '';
+            display: block;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #333;
         }
+        .d-right { grid-column: 3; grid-row: 2; border-radius: 0 8px 8px 0; }
+        .d-down { grid-column: 2; grid-row: 3; border-radius: 0 0 8px 8px; }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            transform: rotate(-15deg); 
+            margin-right: 10px;
+        }
+        .action-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .action-group:nth-child(1) {
+            margin-top: 25px; 
+        }
+        .a-btn {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            background-color: #b00; 
+            border: 2px solid #500;
+            color: rgba(255,255,255,0.7);
+            font-weight: bold;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 2px 4px 0 #500, inset 2px 2px 5px rgba(255,255,255,0.2);
+            padding: 0;
+        }
+        .a-btn:active {
+            box-shadow: 0 2px 0 #500, inset 2px 2px 5px rgba(255,255,255,0.2);
+            transform: translateY(2px);
+        }
+        .btn-label {
+            margin-top: 8px;
+            color: #aaa;
+            font-size: 14px;
+            font-weight: bold;
+            transform: rotate(15deg); 
+            letter-spacing: 2px;
+        }
+
         .keyboard-hint {
             margin-top: 15px;
             font-size: 12px;
-            color: #aaa;
+            color: #888;
             text-align: center;
             line-height: 1.6;
         }
@@ -132,7 +241,7 @@
 </head>
 <body>
 
-    <h2>魔法氣泡練習曲</h2>
+    <h2>魔法氣泡掌機練習曲</h2>
     
     <!-- 難度控制列 -->
     <div class="settings-bar">
@@ -154,23 +263,41 @@
 
     <!-- 遊戲佈局：主畫布與預告區 -->
     <div class="game-layout">
-        <canvas id="gameCanvas" width="240" height="480"></canvas>
+        <!-- 畫布與遮罩容器 -->
+        <div class="canvas-container">
+            <canvas id="gameCanvas" width="240" height="480"></canvas>
+            <div id="startOverlay" class="start-overlay">
+                <button id="btnStart" class="btn-start">開始遊戲</button>
+            </div>
+        </div>
+        
         <div class="next-panel">
             NEXT
             <canvas id="nextCanvas" width="60" height="220"></canvas>
         </div>
     </div>
 
-    <!-- 虛擬按鍵 -->
-    <div class="controls">
-        <div class="row">
-            <button id="btnRotL" class="control-btn">↺ 左轉</button>
-            <button id="btnRotR" class="control-btn">↻ 右轉</button>
+    <!-- 掌機風格控制器 -->
+    <div class="controller">
+        <!-- 左側十字鍵 -->
+        <div class="d-pad">
+            <div id="btnUp" class="d-btn d-up">▲</div>
+            <div id="btnLeft" class="d-btn d-left">◀</div>
+            <div class="d-center"></div>
+            <div id="btnRight" class="d-btn d-right">▶</div>
+            <div id="btnDown" class="d-btn d-down">▼</div>
         </div>
-        <div class="row">
-            <button id="btnLeft" class="control-btn">⬅️ 左移</button>
-            <button id="btnDown" class="control-btn">⬇️ 下降</button>
-            <button id="btnRight" class="control-btn">➡️ 右移</button>
+        
+        <!-- 右側動作按鈕 -->
+        <div class="action-buttons">
+            <div class="action-group">
+                <button id="btnRotL" class="a-btn">B</button>
+                <span class="btn-label">左轉</span>
+            </div>
+            <div class="action-group">
+                <button id="btnRotR" class="a-btn">A</button>
+                <span class="btn-label">右轉</span>
+            </div>
         </div>
     </div>
 
@@ -190,6 +317,8 @@
     const chainEl = document.getElementById('chain');
     const diffSelect = document.getElementById('difficulty');
     const btnRestart = document.getElementById('btnRestart');
+    const startOverlay = document.getElementById('startOverlay');
+    const btnStart = document.getElementById('btnStart');
 
     // 遊戲參數設定
     const COLS = 6;
@@ -204,13 +333,12 @@
         '#CC33FF'  // 5: 紫
     ];
 
-    let grid = [];
+    let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
     let score = 0;
     let currentChain = 0;
-    let gameState = 'PLAYING'; // PLAYING, ANIMATING, GAMEOVER
+    let gameState = 'IDLE'; // IDLE(待機), PLAYING(遊玩中), ANIMATING(動畫中), GAMEOVER(結束)
     let numColors = 5; // 預設難度為5色
 
-    // 當前落下的氣泡與預告佇列
     let activePiece = null;
     let nextPieces = [];
     let dropInterval = 1200; // 落下速度 (1.2 秒)
@@ -224,10 +352,11 @@
         scoreEl.innerText = score;
         chainEl.innerText = currentChain;
         
-        // 讀取當前選擇的難度顏色數量
         numColors = parseInt(diffSelect.value);
+        nextPieces = []; 
         
-        nextPieces = []; // 清空預告區
+        // 隱藏開始遮罩
+        startOverlay.classList.add('hidden');
         gameState = 'PLAYING';
         
         spawnPiece();
@@ -235,43 +364,40 @@
         draw();
     }
 
-    // 隨機產生顏色 (依據當前難度)
     function getRandomColor() {
         return Math.floor(Math.random() * numColors) + 1;
     }
 
-    // 產生新氣泡與維護預告佇列
     function spawnPiece() {
-        // 初始化預告佇列
         if (nextPieces.length === 0) {
             nextPieces.push({ c1: getRandomColor(), c2: getRandomColor() });
             nextPieces.push({ c1: getRandomColor(), c2: getRandomColor() });
         }
 
-        // 從預告佇列取出下一個，並補充新的一組到佇列尾端
         const next = nextPieces.shift();
         nextPieces.push({ c1: getRandomColor(), c2: getRandomColor() });
 
         activePiece = {
-            x: 2, y: 0,       // 軸心氣泡座標
-            color1: next.c1,  // 軸心氣泡顏色
-            color2: next.c2,  // 衛星氣泡顏色
-            rot: 0            // 0:上, 1:右, 2:下, 3:左 (衛星相對於軸心)
+            x: 2, y: 0,
+            color1: next.c1,
+            color2: next.c2,
+            rot: 0
         };
         
         drawNext();
 
-        // 檢查遊戲結束
+        // 檢查是否頂到最上方(遊戲結束)
         if (grid[activePiece.y][activePiece.x] !== 0) {
             gameState = 'GAMEOVER';
             draw();
             setTimeout(() => {
-                alert("遊戲結束！總分: " + score + "\n可以點擊上方「重新開始」再來一局！");
+                alert("遊戲結束！總分: " + score);
+                startOverlay.classList.remove('hidden');
+                btnStart.innerText = "再來一局";
             }, 100);
         }
     }
 
-    // 取得衛星氣泡的座標
     function getSatPos(x, y, rot) {
         switch(rot) {
             case 0: return { x: x, y: y - 1 };
@@ -281,19 +407,15 @@
         }
     }
 
-    // 檢查碰撞
     function isValid(pX, pY, pRot) {
         const sat = getSatPos(pX, pY, pRot);
-        // 邊界檢查
         if (pX < 0 || pX >= COLS || pY >= ROWS) return false;
         if (sat.x < 0 || sat.x >= COLS || sat.y >= ROWS) return false;
-        // 網格佔用檢查
         if (pY >= 0 && grid[pY][pX] !== 0) return false;
         if (sat.y >= 0 && grid[sat.y][sat.x] !== 0) return false;
         return true;
     }
 
-    // 鎖定氣泡到網格中
     function lockPiece() {
         if (activePiece.y >= 0) grid[activePiece.y][activePiece.x] = activePiece.color1;
         const sat = getSatPos(activePiece.x, activePiece.y, activePiece.rot);
@@ -305,11 +427,9 @@
         processBoard();
     }
 
-    // 處理重力下墜與消除 (連鎖判定)
     function processBoard() {
         let moved = applyGravity();
         
-        // 留一點時間讓玩家看到氣泡落下
         setTimeout(() => {
             let cleared = checkClears();
             if (cleared > 0) {
@@ -318,13 +438,10 @@
                 score += (cleared * 10) * currentChain;
                 scoreEl.innerText = score;
                 draw();
-                // 延遲後再次遞迴處理，形成連鎖視覺效果
                 setTimeout(processBoard, 400);
             } else if (moved) {
-                // 有掉落但沒消除，檢查看看有沒有新消除
                 setTimeout(processBoard, 100);
             } else {
-                // 盤面穩定
                 gameState = 'PLAYING';
                 chainEl.innerText = '0';
                 spawnPiece();
@@ -332,7 +449,6 @@
         }, 150);
     }
 
-    // 重力函數：讓懸空的氣泡掉到最底層
     function applyGravity() {
         let moved = false;
         for (let c = 0; c < COLS; c++) {
@@ -351,7 +467,6 @@
         return moved;
     }
 
-    // 消除判定 (BFS 尋找同色相連>=4)
     function checkClears() {
         let visited = Array.from({length: ROWS}, () => Array(COLS).fill(false));
         let toPop = [];
@@ -384,12 +499,10 @@
             }
         }
 
-        // 執行消除
         toPop.forEach(p => { grid[p.r][p.c] = 0; });
         return toPop.length;
     }
 
-    // 底層繪製實體氣泡的函式
     function drawPuyoAtOrigin(targetCtx, px, py, colorIdx) {
         targetCtx.beginPath();
         targetCtx.arc(px + BLOCK_SIZE / 2, py + BLOCK_SIZE / 2, BLOCK_SIZE / 2 - 2, 0, Math.PI * 2);
@@ -399,14 +512,12 @@
         targetCtx.lineWidth = 1;
         targetCtx.stroke();
         
-        // 高光增加立體感
         targetCtx.beginPath();
         targetCtx.arc(px + BLOCK_SIZE / 2 - 6, py + BLOCK_SIZE / 2 - 6, BLOCK_SIZE / 6, 0, Math.PI * 2);
         targetCtx.fillStyle = 'rgba(255,255,255,0.6)';
         targetCtx.fill();
     }
 
-    // 繪製主畫布
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -427,7 +538,6 @@
         }
     }
 
-    // 繪製預告區
     function drawNext() {
         nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
         if (nextPieces.length < 2) return;
@@ -469,7 +579,6 @@
         if (isValid(activePiece.x, activePiece.y, nextRot)) {
             activePiece.rot = nextRot;
         } else {
-            // 踢牆判定
             if (isValid(activePiece.x + 1, activePiece.y, nextRot)) { activePiece.x++; activePiece.rot = nextRot; }
             else if (isValid(activePiece.x - 1, activePiece.y, nextRot)) { activePiece.x--; activePiece.rot = nextRot; }
         }
@@ -479,7 +588,6 @@
         if (isValid(activePiece.x, activePiece.y, nextRot)) {
             activePiece.rot = nextRot;
         } else {
-            // 踢牆判定
             if (isValid(activePiece.x - 1, activePiece.y, nextRot)) { activePiece.x--; activePiece.rot = nextRot; }
             else if (isValid(activePiece.x + 1, activePiece.y, nextRot)) { activePiece.x++; activePiece.rot = nextRot; }
         }
@@ -489,12 +597,9 @@
     
     document.addEventListener('keydown', (e) => {
         if (gameState !== 'PLAYING') return;
-
-        // 防止方向鍵與空白鍵捲動網頁
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
             e.preventDefault();
         }
-
         switch (e.key) {
             case 'ArrowLeft': case 'a': case 'A': moveLeft(); break;
             case 'ArrowRight': case 'd': case 'D': moveRight(); break;
@@ -503,17 +608,20 @@
             case 'j': case 'J': rotateLeft(); break;
             case 'k': case 'K': rotateRight(); break;
         }
-        draw(); // 操作後立刻重繪
+        draw();
     });
 
     // ======= 綁定 UI 事件與虛擬按鍵 =======
 
+    // 開始按鈕
+    btnStart.addEventListener('click', resetGame);
+    
+    // 重新開始按鈕
     btnRestart.addEventListener('click', () => {
         resetGame();
-        btnRestart.blur(); // 移除焦點，避免按空白鍵誤觸
+        btnRestart.blur();
     });
-
-    // 切換難度時可選擇是否自動重新開始，此處設定不自動，由玩家按鈕決定
+    
     diffSelect.addEventListener('change', () => {
         diffSelect.blur();
     });
@@ -530,6 +638,7 @@
         btn.addEventListener('mousedown', handler);
     }
 
+    bindControl('btnUp', hardDrop);
     bindControl('btnLeft', moveLeft);
     bindControl('btnRight', moveRight);
     bindControl('btnDown', moveDown);
@@ -551,8 +660,8 @@
     // 防止網頁上下捲動干擾(手機端)
     document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
-    // 啟動遊戲
-    resetGame();
+    // 啟動畫面繪製與迴圈
+    draw();
     update();
 </script>
 </body>
