@@ -16,6 +16,7 @@
             align-items: center;
             touch-action: none; 
             user-select: none;
+            -webkit-user-select: none; /* 強化防長按選取 */
         }
         h2 { margin: 5px 0 10px 0; font-size: 20px; text-shadow: 0 0 5px #fff; }
         
@@ -161,8 +162,9 @@
             touch-action: manipulation;
             font-size: 24px;
             box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+            -webkit-tap-highlight-color: transparent;
         }
-        .d-btn:active { background-color: #666; }
+        .d-btn:active, .d-btn.active { background-color: #666; }
         
         .d-up { grid-column: 2; grid-row: 1; border-radius: 12px 12px 0 0; }
         .d-left { grid-column: 1; grid-row: 2; border-radius: 12px 0 0 12px; }
@@ -212,8 +214,9 @@
             touch-action: manipulation;
             box-shadow: 2px 4px 0 #500, inset 2px 2px 5px rgba(255,255,255,0.2);
             padding: 0;
+            -webkit-tap-highlight-color: transparent;
         }
-        .a-btn:active {
+        .a-btn:active, .a-btn.active {
             box-shadow: 0 2px 0 #500, inset 2px 2px 5px rgba(255,255,255,0.2);
             transform: translateY(2px);
         }
@@ -344,7 +347,7 @@
         
         numColors = parseInt(diffSelect.value);
         nextPieces = []; 
-        particles = []; // 清空特效
+        particles = [];
         
         startOverlay.classList.add('hidden');
         gameState = 'PLAYING';
@@ -422,7 +425,6 @@
                 chainEl.innerText = currentChain;
                 score += (cleared * 10) * currentChain;
                 scoreEl.innerText = score;
-                // 延長一點點時間讓玩家看清楚特效再掉落
                 setTimeout(processBoard, 500); 
             } else if (moved) {
                 setTimeout(processBoard, 150);
@@ -452,7 +454,6 @@
         return moved;
     }
 
-    // 產生消除特效的粒子
     function createExplosion(c, r, colorIdx) {
         const px = c * BLOCK_SIZE + BLOCK_SIZE / 2;
         const py = r * BLOCK_SIZE + BLOCK_SIZE / 2;
@@ -466,7 +467,7 @@
                 y: py,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
-                life: 30,       // 存活 30 個影格
+                life: 30,       
                 maxLife: 30,
                 color: color,
                 size: Math.random() * 4 + 2
@@ -507,9 +508,7 @@
         }
 
         toPop.forEach(p => { 
-            // 觸發特效
             createExplosion(p.c, p.r, grid[p.r][p.c]);
-            // 清除氣泡
             grid[p.r][p.c] = 0; 
         });
         return toPop.length;
@@ -561,7 +560,6 @@
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 畫盤面
         for (let r = 0; r < ROWS; r++) {
             for (let c = 0; c < COLS; c++) {
                 if (grid[r][c] !== 0) {
@@ -570,7 +568,6 @@
             }
         }
 
-        // 畫掉落中的氣泡
         if (activePiece && gameState === 'PLAYING') {
             drawPuyoAtOrigin(ctx, activePiece.x * BLOCK_SIZE, activePiece.y * BLOCK_SIZE, activePiece.color1);
             const sat = getSatPos(activePiece.x, activePiece.y, activePiece.rot);
@@ -579,17 +576,15 @@
             }
         }
         
-        // 畫消除粒子特效
         particles.forEach(p => {
-            ctx.globalAlpha = p.life / p.maxLife; // 漸隱效果
+            ctx.globalAlpha = p.life / p.maxLife;
             ctx.fillStyle = p.color;
             ctx.beginPath();
-            ctx.arc(p.x, p.y, p.size + (p.maxLife - p.life) * 0.1, 0, Math.PI * 2); // 會稍微膨脹
+            ctx.arc(p.x, p.y, p.size + (p.maxLife - p.life) * 0.1, 0, Math.PI * 2); 
             ctx.fill();
         });
-        ctx.globalAlpha = 1.0; // 恢復透明度設定
+        ctx.globalAlpha = 1.0; 
 
-        // 更新預告區
         drawNext();
     }
 
@@ -605,6 +600,8 @@
         drawPuyoAtOrigin(nextCtx, offsetX, 120, nextPieces[1].c2);
         drawPuyoAtOrigin(nextCtx, offsetX, 160, nextPieces[1].c1);
     }
+    
+    // ======= 動作與控制邏輯 =======
     
     function moveLeft() {
         if (isValid(activePiece.x - 1, activePiece.y, activePiece.rot)) activePiece.x--;
@@ -646,6 +643,7 @@
         }
     }
 
+    // 實體鍵盤綁定
     document.addEventListener('keydown', (e) => {
         if (gameState !== 'PLAYING') return;
         if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) {
@@ -662,43 +660,76 @@
     });
 
     btnStart.addEventListener('click', resetGame);
-    
     btnRestart.addEventListener('click', () => {
         resetGame();
         btnRestart.blur();
     });
-    
     diffSelect.addEventListener('change', () => {
         diffSelect.blur();
     });
     
-    function bindControl(id, actionFn) {
+    // 虛擬按鍵綁定 (加入長按連續觸發功能)
+    function bindControl(id, actionFn, isContinuous = false) {
         const btn = document.getElementById(id);
-        const handler = (e) => {
-            e.preventDefault(); 
+        let timeoutId = null;
+        let intervalId = null;
+
+        const startAction = (e) => {
+            e.preventDefault(); // 防止手機預設行為(選取、右鍵選單等)
             if(gameState !== 'PLAYING') return;
-            actionFn();
+            
+            btn.classList.add('active'); // 增加點擊時的視覺回饋
+            actionFn(); // 首次按下立刻觸發一次
+            
+            if (isContinuous) {
+                // 延遲一段時間後開始連續觸發 (250毫秒)
+                timeoutId = setTimeout(() => {
+                    // 每隔一段時間連續觸發 (50毫秒)
+                    intervalId = setInterval(() => {
+                        if (gameState === 'PLAYING') actionFn();
+                    }, 50);
+                }, 250);
+            }
         };
-        btn.addEventListener('touchstart', handler, {passive: false});
-        btn.addEventListener('mousedown', handler);
+
+        const stopAction = (e) => {
+            e.preventDefault();
+            btn.classList.remove('active');
+            clearTimeout(timeoutId);
+            clearInterval(intervalId);
+        };
+
+        // 綁定按下事件
+        btn.addEventListener('touchstart', startAction, {passive: false});
+        btn.addEventListener('mousedown', startAction);
+
+        // 綁定放開或移開事件
+        btn.addEventListener('touchend', stopAction, {passive: false});
+        btn.addEventListener('touchcancel', stopAction, {passive: false});
+        btn.addEventListener('mouseup', stopAction);
+        btn.addEventListener('mouseleave', stopAction);
+        
+        // 阻止右鍵選單(長按時)
+        btn.addEventListener('contextmenu', e => e.preventDefault());
     }
 
-    bindControl('btnUp', hardDrop);
-    bindControl('btnLeft', moveLeft);
-    bindControl('btnRight', moveRight);
-    bindControl('btnDown', moveDown);
-    bindControl('btnRotL', rotateLeft);
-    bindControl('btnRotR', rotateRight);
+    // 方向鍵支援連續觸發 (第三個參數帶入 true)
+    bindControl('btnLeft', moveLeft, true);
+    bindControl('btnRight', moveRight, true);
+    bindControl('btnDown', moveDown, true);
+    
+    // 快速落下與旋轉鍵不連續觸發
+    bindControl('btnUp', hardDrop, false);
+    bindControl('btnRotL', rotateLeft, false);
+    bindControl('btnRotR', rotateRight, false);
 
     // 遊戲主迴圈
     function update() {
-        // 處理粒子動畫邏輯
         for (let i = particles.length - 1; i >= 0; i--) {
             let p = particles[i];
             p.x += p.vx;
             p.y += p.vy;
             p.life--;
-            // 讓粒子帶一點重力下墜的感覺
             p.vy += 0.2; 
             
             if (p.life <= 0) {
@@ -706,7 +737,6 @@
             }
         }
 
-        // 處理遊戲邏輯
         if (gameState === 'PLAYING') {
             let now = Date.now();
             if (now - lastDropTime > dropInterval) {
@@ -714,14 +744,12 @@
             }
         }
         
-        // 每幀重繪 (確保粒子動畫順暢)
         draw();
         requestAnimationFrame(update);
     }
 
     document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
-    // 啟動迴圈
     update();
 </script>
 </body>
