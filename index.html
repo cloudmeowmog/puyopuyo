@@ -18,6 +18,38 @@
             user-select: none;
         }
         h2 { margin: 5px 0 10px 0; font-size: 20px; text-shadow: 0 0 5px #fff; }
+        .settings-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            max-width: 310px;
+            margin-bottom: 10px;
+            background: #2a2a2a;
+            padding: 8px;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+        select {
+            background: #444;
+            color: #fff;
+            border: 1px solid #666;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+        .btn-restart {
+            background-color: #ff5555;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-restart:active { background-color: #cc4444; }
+        
         .info {
             display: flex;
             justify-content: space-between;
@@ -71,7 +103,7 @@
             justify-content: center;
             gap: 10px;
         }
-        button {
+        .control-btn {
             background-color: #333;
             color: #fff;
             border: 2px solid #555;
@@ -83,7 +115,7 @@
             touch-action: manipulation;
             cursor: pointer;
         }
-        button:active {
+        .control-btn:active {
             background-color: #555;
         }
         #btnDown {
@@ -102,6 +134,19 @@
 
     <h2>魔法氣泡練習曲</h2>
     
+    <!-- 難度控制列 -->
+    <div class="settings-bar">
+        <div>
+            <label for="difficulty">難度：</label>
+            <select id="difficulty">
+                <option value="3">簡單 (3色)</option>
+                <option value="4">中等 (4色)</option>
+                <option value="5" selected>困難 (5色)</option>
+            </select>
+        </div>
+        <button id="btnRestart" class="btn-restart">重新開始</button>
+    </div>
+
     <div class="info">
         <div>分數: <span id="score">0</span></div>
         <div>連鎖: <span id="chain">0</span></div>
@@ -109,10 +154,7 @@
 
     <!-- 遊戲佈局：主畫布與預告區 -->
     <div class="game-layout">
-        <!-- 遊戲畫布，6欄 12列 (每格 40x40 像素) -->
         <canvas id="gameCanvas" width="240" height="480"></canvas>
-        
-        <!-- 預告區 -->
         <div class="next-panel">
             NEXT
             <canvas id="nextCanvas" width="60" height="220"></canvas>
@@ -122,13 +164,13 @@
     <!-- 虛擬按鍵 -->
     <div class="controls">
         <div class="row">
-            <button id="btnRotL">↺ 左轉</button>
-            <button id="btnRotR">↻ 右轉</button>
+            <button id="btnRotL" class="control-btn">↺ 左轉</button>
+            <button id="btnRotR" class="control-btn">↻ 右轉</button>
         </div>
         <div class="row">
-            <button id="btnLeft">⬅️ 左移</button>
-            <button id="btnDown">⬇️ 下降</button>
-            <button id="btnRight">➡️ 右移</button>
+            <button id="btnLeft" class="control-btn">⬅️ 左移</button>
+            <button id="btnDown" class="control-btn">⬇️ 下降</button>
+            <button id="btnRight" class="control-btn">➡️ 右移</button>
         </div>
     </div>
 
@@ -146,6 +188,8 @@
     const nextCtx = nextCanvas.getContext('2d');
     const scoreEl = document.getElementById('score');
     const chainEl = document.getElementById('chain');
+    const diffSelect = document.getElementById('difficulty');
+    const btnRestart = document.getElementById('btnRestart');
 
     // 遊戲參數設定
     const COLS = 6;
@@ -160,20 +204,40 @@
         '#CC33FF'  // 5: 紫
     ];
 
-    let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+    let grid = [];
     let score = 0;
     let currentChain = 0;
     let gameState = 'PLAYING'; // PLAYING, ANIMATING, GAMEOVER
+    let numColors = 5; // 預設難度為5色
 
     // 當前落下的氣泡與預告佇列
     let activePiece = null;
     let nextPieces = [];
     let dropInterval = 1200; // 落下速度 (1.2 秒)
-    let lastDropTime = Date.now();
+    let lastDropTime = 0;
 
-    // 隨機產生顏色
+    // 遊戲初始化/重置
+    function resetGame() {
+        grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+        score = 0;
+        currentChain = 0;
+        scoreEl.innerText = score;
+        chainEl.innerText = currentChain;
+        
+        // 讀取當前選擇的難度顏色數量
+        numColors = parseInt(diffSelect.value);
+        
+        nextPieces = []; // 清空預告區
+        gameState = 'PLAYING';
+        
+        spawnPiece();
+        lastDropTime = Date.now();
+        draw();
+    }
+
+    // 隨機產生顏色 (依據當前難度)
     function getRandomColor() {
-        return Math.floor(Math.random() * 5) + 1;
+        return Math.floor(Math.random() * numColors) + 1;
     }
 
     // 產生新氣泡與維護預告佇列
@@ -200,7 +264,10 @@
         // 檢查遊戲結束
         if (grid[activePiece.y][activePiece.x] !== 0) {
             gameState = 'GAMEOVER';
-            alert("遊戲結束！總分: " + score + "\n請重新整理頁面再來一局！");
+            draw();
+            setTimeout(() => {
+                alert("遊戲結束！總分: " + score + "\n可以點擊上方「重新開始」再來一局！");
+            }, 100);
         }
     }
 
@@ -363,6 +430,8 @@
     // 繪製預告區
     function drawNext() {
         nextCtx.clearRect(0, 0, nextCanvas.width, nextCanvas.height);
+        if (nextPieces.length < 2) return;
+        
         const offsetX = (nextCanvas.width - BLOCK_SIZE) / 2;
         
         drawPuyoAtOrigin(nextCtx, offsetX, 10, nextPieces[0].c2);
@@ -427,39 +496,27 @@
         }
 
         switch (e.key) {
-            case 'ArrowLeft':
-            case 'a':
-            case 'A':
-                moveLeft();
-                break;
-            case 'ArrowRight':
-            case 'd':
-            case 'D':
-                moveRight();
-                break;
-            case 'ArrowDown':
-            case 's':
-            case 'S':
-                moveDown();
-                break;
-            case 'ArrowUp':
-            case 'w':
-            case 'W':
-                hardDrop();
-                break;
-            case 'j':
-            case 'J':
-                rotateLeft();
-                break;
-            case 'k':
-            case 'K':
-                rotateRight();
-                break;
+            case 'ArrowLeft': case 'a': case 'A': moveLeft(); break;
+            case 'ArrowRight': case 'd': case 'D': moveRight(); break;
+            case 'ArrowDown': case 's': case 'S': moveDown(); break;
+            case 'ArrowUp': case 'w': case 'W': hardDrop(); break;
+            case 'j': case 'J': rotateLeft(); break;
+            case 'k': case 'K': rotateRight(); break;
         }
         draw(); // 操作後立刻重繪
     });
 
-    // ======= 綁定虛擬按鍵 =======
+    // ======= 綁定 UI 事件與虛擬按鍵 =======
+
+    btnRestart.addEventListener('click', () => {
+        resetGame();
+        btnRestart.blur(); // 移除焦點，避免按空白鍵誤觸
+    });
+
+    // 切換難度時可選擇是否自動重新開始，此處設定不自動，由玩家按鈕決定
+    diffSelect.addEventListener('change', () => {
+        diffSelect.blur();
+    });
     
     function bindControl(id, actionFn) {
         const btn = document.getElementById(id);
@@ -484,7 +541,7 @@
         if (gameState === 'PLAYING') {
             let now = Date.now();
             if (now - lastDropTime > dropInterval) {
-                moveDown(); // 自然下落同等 moveDown()
+                moveDown();
             }
         }
         draw();
@@ -495,7 +552,7 @@
     document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
     // 啟動遊戲
-    spawnPiece();
+    resetGame();
     update();
 </script>
 </body>
