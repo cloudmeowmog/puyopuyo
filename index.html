@@ -41,7 +41,7 @@
             border: 1px solid #666;
             padding: 5px;
             border-radius: 4px;
-            font-size: 16px; /* 放大切換難度的字體 */
+            font-size: 16px;
             outline: none;
         }
         .btn-restart {
@@ -149,10 +149,9 @@
             border-bottom: 5px solid #111;
         }
 
-        /* 放大十字方向鍵 */
         .d-pad {
             display: grid;
-            grid-template-columns: 45px 45px 45px; /* 從35px放大至45px */
+            grid-template-columns: 45px 45px 45px;
             grid-template-rows: 45px 45px 45px;
             position: relative;
         }
@@ -164,7 +163,7 @@
             align-items: center;
             cursor: pointer;
             touch-action: manipulation;
-            font-size: 24px; /* 放大的箭頭圖示 */
+            font-size: 24px;
             box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
         }
         .d-btn:active { background-color: #666; }
@@ -179,7 +178,7 @@
         .d-center::after {
             content: '';
             display: block;
-            width: 20px; /* 放大的中心點 */
+            width: 20px;
             height: 20px;
             border-radius: 50%;
             background: #333;
@@ -187,10 +186,9 @@
         .d-right { grid-column: 3; grid-row: 2; border-radius: 0 12px 12px 0; }
         .d-down { grid-column: 2; grid-row: 3; border-radius: 0 0 12px 12px; }
 
-        /* 放大 A/B 動作按鈕 */
         .action-buttons {
             display: flex;
-            gap: 18px; /* 稍微增加按鈕間距 */
+            gap: 18px;
             transform: rotate(-15deg); 
             margin-right: 5px;
         }
@@ -200,17 +198,17 @@
             align-items: center;
         }
         .action-group:nth-child(1) {
-            margin-top: 30px; /* B 鍵較低的程度微調 */
+            margin-top: 30px;
         }
         .a-btn {
-            width: 65px;  /* 從55px放大至65px */
+            width: 65px;
             height: 65px;
             border-radius: 50%;
             background-color: #b00; 
             border: 2px solid #500;
             color: rgba(255,255,255,0.7);
             font-weight: bold;
-            font-size: 28px; /* 放大的文字 */
+            font-size: 28px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -279,7 +277,7 @@
         </div>
     </div>
 
-    <!-- 掌機風格控制器 (放大版) -->
+    <!-- 掌機風格控制器 -->
     <div class="controller">
         <!-- 左側十字鍵 -->
         <div class="d-pad">
@@ -338,12 +336,12 @@
     let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
     let score = 0;
     let currentChain = 0;
-    let gameState = 'IDLE'; // IDLE(待機), PLAYING(遊玩中), ANIMATING(動畫中), GAMEOVER(結束)
-    let numColors = 5; // 預設難度為5色
+    let gameState = 'IDLE'; 
+    let numColors = 5;
 
     let activePiece = null;
     let nextPieces = [];
-    let dropInterval = 1200; // 落下速度 (1.2 秒)
+    let dropInterval = 1200; 
     let lastDropTime = 0;
 
     // 遊戲初始化/重置
@@ -388,7 +386,6 @@
         
         drawNext();
 
-        // 檢查是否頂到最上方(遊戲結束)
         if (grid[activePiece.y][activePiece.x] !== 0) {
             gameState = 'GAMEOVER';
             draw();
@@ -505,18 +502,58 @@
         return toPop.length;
     }
 
+    // ==========================================
+    // 全新進化的氣泡繪製函式：加入了可愛的大眼睛！
+    // ==========================================
     function drawPuyoAtOrigin(targetCtx, px, py, colorIdx) {
+        const cx = px + BLOCK_SIZE / 2;
+        const cy = py + BLOCK_SIZE / 2;
+        const radius = BLOCK_SIZE / 2 - 2;
+
+        // 1. 畫氣泡主體
         targetCtx.beginPath();
-        targetCtx.arc(px + BLOCK_SIZE / 2, py + BLOCK_SIZE / 2, BLOCK_SIZE / 2 - 2, 0, Math.PI * 2);
+        targetCtx.arc(cx, cy, radius, 0, Math.PI * 2);
         targetCtx.fillStyle = COLORS[colorIdx];
         targetCtx.fill();
-        targetCtx.strokeStyle = '#fff';
+        targetCtx.strokeStyle = 'rgba(0,0,0,0.3)';
         targetCtx.lineWidth = 1;
         targetCtx.stroke();
         
+        // 氣泡邊緣的高光感
         targetCtx.beginPath();
-        targetCtx.arc(px + BLOCK_SIZE / 2 - 6, py + BLOCK_SIZE / 2 - 6, BLOCK_SIZE / 6, 0, Math.PI * 2);
-        targetCtx.fillStyle = 'rgba(255,255,255,0.6)';
+        targetCtx.arc(cx - 4, cy - 6, radius / 2.5, 0, Math.PI * 2);
+        targetCtx.fillStyle = 'rgba(255,255,255,0.2)';
+        targetCtx.fill();
+
+        // 2. 畫大大的白眼球
+        targetCtx.fillStyle = '#FFFFFF';
+        // 左眼
+        targetCtx.beginPath();
+        targetCtx.ellipse(cx - 6, cy - 2, 5, 7, 0, 0, Math.PI * 2);
+        targetCtx.fill();
+        // 右眼
+        targetCtx.beginPath();
+        targetCtx.ellipse(cx + 6, cy - 2, 5, 7, 0, 0, Math.PI * 2);
+        targetCtx.fill();
+
+        // 3. 畫黑眼珠
+        targetCtx.fillStyle = '#000000';
+        // 左黑眼珠 (靠中間一點，有呆萌感)
+        targetCtx.beginPath();
+        targetCtx.arc(cx - 4.5, cy - 1, 2.5, 0, Math.PI * 2);
+        targetCtx.fill();
+        // 右黑眼珠
+        targetCtx.beginPath();
+        targetCtx.arc(cx + 4.5, cy - 1, 2.5, 0, Math.PI * 2);
+        targetCtx.fill();
+
+        // 4. 眼珠裡的小高光 (靈活度UP!)
+        targetCtx.fillStyle = '#FFFFFF';
+        targetCtx.beginPath();
+        targetCtx.arc(cx - 5.5, cy - 2, 1, 0, Math.PI * 2);
+        targetCtx.fill();
+        targetCtx.beginPath();
+        targetCtx.arc(cx + 3.5, cy - 2, 1, 0, Math.PI * 2);
         targetCtx.fill();
     }
 
@@ -577,7 +614,7 @@
         lastDropTime = Date.now();
     }
     function rotateLeft() {
-        const nextRot = (activePiece.rot + 3) % 4; // 逆時針
+        const nextRot = (activePiece.rot + 3) % 4; 
         if (isValid(activePiece.x, activePiece.y, nextRot)) {
             activePiece.rot = nextRot;
         } else {
@@ -586,7 +623,7 @@
         }
     }
     function rotateRight() {
-        const nextRot = (activePiece.rot + 1) % 4; // 順時針
+        const nextRot = (activePiece.rot + 1) % 4; 
         if (isValid(activePiece.x, activePiece.y, nextRot)) {
             activePiece.rot = nextRot;
         } else {
@@ -615,10 +652,8 @@
 
     // ======= 綁定 UI 事件與虛擬按鍵 =======
 
-    // 開始按鈕
     btnStart.addEventListener('click', resetGame);
     
-    // 重新開始按鈕
     btnRestart.addEventListener('click', () => {
         resetGame();
         btnRestart.blur();
@@ -662,7 +697,6 @@
     // 防止網頁上下捲動干擾(手機端)
     document.body.addEventListener('touchmove', function(e) { e.preventDefault(); }, { passive: false });
 
-    // 啟動畫面繪製與迴圈
     draw();
     update();
 </script>
